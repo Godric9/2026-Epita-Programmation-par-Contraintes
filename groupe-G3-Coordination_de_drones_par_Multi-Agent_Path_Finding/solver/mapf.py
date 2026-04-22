@@ -1,10 +1,10 @@
-# solver/mapf.py
 from __future__ import annotations
 import time
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 from ortools.sat.python import cp_model
 from .grid import Grid, Pos
+from .astar import astar
 
 
 @dataclass
@@ -34,7 +34,17 @@ class MAPFSolver:
         pos_to_idx = {p: i for i, p in enumerate(positions)}
         N = len(self.drones)
         P = len(positions)
-        T = 2 * (self.grid.rows + self.grid.cols) + N
+
+        # A* individual paths — tighten horizon and provide warm-start hints
+        astar_paths: List[Optional[List[Pos]]] = [
+            astar(self.grid, d.start, d.goal) for d in self.drones
+        ]
+        # Horizon: max individual A* path length + slack for conflict resolution
+        astar_lens = [len(p) - 1 for p in astar_paths if p is not None]
+        if astar_lens:
+            T = max(astar_lens) + N + 4
+        else:
+            T = 2 * (self.grid.rows + self.grid.cols) + N
 
         model = cp_model.CpModel()
         t0 = time.time()
@@ -95,6 +105,18 @@ class MAPFSolver:
             arrival_vars.append(arr)
         model.AddMaxEquality(makespan_var, arrival_vars)
         model.Minimize(makespan_var)
+
+        # Warm-start: inject A* individual paths as hints for CP-SAT
+        for a, path in enumerate(astar_paths):
+            if path is None:
+                continue
+            for t in range(T + 1):
+                pos = path[min(t, len(path) - 1)]  # stay at goal after arrival
+                hint_idx = pos_to_idx.get(pos)
+                if hint_idx is None:
+                    continue
+                for p in range(P):
+                    model.AddHint(x[a][p][t], 1 if p == hint_idx else 0)
 
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = self.time_limit_s
