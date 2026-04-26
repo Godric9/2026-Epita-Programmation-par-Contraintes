@@ -1,5 +1,6 @@
 """Package wdp — Winner Determination Problem.
 
 Modules :
-    instance — Bid / Instance / Allocation + I/O JSON
+    instance     — Bid / Instance / Allocation + I/O JSON
+    solver_cpsat — Solveur CP-SAT (livrables 1-2-3)
 """
