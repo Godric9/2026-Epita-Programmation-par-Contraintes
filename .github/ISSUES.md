@@ -24,7 +24,7 @@ reference issue numbers in their merge messages.
 - **Owner:** @56Nights
 - **Reviewer:** @Sosolalt
 - **Branch:** main (direct)
-- **Status:** open
+- **Status:** closed 2026-05-04, reviewed by @Sosolalt
 - **Acceptance:**
   - [x] LOS ranking by price / sqrt(|S|)
   - [x] respects exclusivity and budget
