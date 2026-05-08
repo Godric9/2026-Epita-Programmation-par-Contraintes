@@ -43,3 +43,15 @@ reference issue numbers in their merge messages.
 - **Discussion:**
   - @NCH04: dummy goods reconstruct xor_groups
   - @Sosolalt (review): parser + dataset land together
+
+## #4 — VCG with budget — DSIC analysis
+- **Owner:** @Sosolalt
+- **Reviewer:** @56Nights
+- **Branch:** main (direct)
+- **Status:** open
+- **Acceptance:**
+  - [x] welfare reoptimization handles budget
+  - [x] research note documenting DSIC failure under hard budgets
+- **Discussion:**
+  - @Sosolalt: budgets break truthfulness — algebra + numeric example
+  - @56Nights (review): note clarifies non-truthfulness under budgets
