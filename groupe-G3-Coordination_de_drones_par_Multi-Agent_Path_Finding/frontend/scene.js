@@ -8,51 +8,72 @@ export class CityScene {
     this.camera = new THREE.PerspectiveCamera(
       55, window.innerWidth / window.innerHeight, 0.1, 500
     );
-    this.camera.position.set(14, 12, 18);
 
     this.controls = new THREE.OrbitControls(this.camera, renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.target.set(5, 2, 5);
 
-    this._noFlyMeshes = [];
+    this._groundMesh    = null;
+    this._gridLines     = null;
+    this._buildingObjects = [];
+    this._noFlyMeshes   = [];
+
     this._addLights();
-    this._addGround();
   }
 
   _addLights() {
-    // Lower ambient so Phong shading produces visible face contrast
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const dir = new THREE.DirectionalLight(0xfff0d0, 0.8);
     dir.position.set(20, 40, 20);
     this.scene.add(dir);
-    // Cool sky fill — tints shadow faces slightly blue for atmosphere
     const fill = new THREE.DirectionalLight(0xaac8e8, 0.25);
     fill.position.set(-10, 10, -10);
     this.scene.add(fill);
   }
 
-  _addGround(rows = 8, cols = 8) {
-    const cx = cols / 2;
-    const cz = rows / 2;
+  // Rebuild ground + grid for new dimensions and reposition camera.
+  resetGrid(rows, cols, alts = 1) {
+    if (this._groundMesh) { this.scene.remove(this._groundMesh); this._groundMesh = null; }
+    if (this._gridLines)  { this.scene.remove(this._gridLines);  this._gridLines  = null; }
 
-    // Ground: one unit of margin around the map on each side
-    const ground = new THREE.Mesh(
+    const cx = cols / 2, cz = rows / 2;
+
+    this._groundMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(cols + 1, rows + 1),
       new THREE.MeshPhongMaterial({ color: 0x304a62 })
     );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.set(cx, -0.01, cz);
-    this.scene.add(ground);
+    this._groundMesh.rotation.x = -Math.PI / 2;
+    this._groundMesh.position.set(cx, -0.01, cz);
+    this.scene.add(this._groundMesh);
 
-    // Grid: one division per cell — intersections land on integer coords 0..cols, 0..rows
-    const grid = new THREE.GridHelper(cols, cols, 0x7090aa, 0x608098);
-    grid.position.set(cx, 0, cz);
-    this.scene.add(grid);
+    this._gridLines = this._buildGridLines(rows, cols);
+    this.scene.add(this._gridLines);
+
+    const dist = Math.max(rows, cols) * 1.4 + alts * 1.5;
+    this.camera.position.set(cx + dist * 0.5, dist * 0.7, cz + dist);
+    this.controls.target.set(cx, 0, cz);
+    this.controls.update();
+  }
+
+  // Custom line grid that works for non-square maps (rows ≠ cols).
+  _buildGridLines(rows, cols) {
+    const pts = [];
+    for (let c = 0; c <= cols; c++) pts.push(c, 0, 0,  c, 0, rows);
+    for (let r = 0; r <= rows; r++) pts.push(0, 0, r,  cols, 0, r);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    return new THREE.LineSegments(
+      geo,
+      new THREE.LineBasicMaterial({ color: 0x608098, transparent: true, opacity: 0.7 })
+    );
+  }
+
+  clearBuildings() {
+    for (const obj of this._buildingObjects) this.scene.remove(obj);
+    this._buildingObjects = [];
   }
 
   addBuildings(buildings, cellSize = 1.0) {
-    this._buildingMeshes = [];
     for (const b of buildings) {
       const h = b.height * cellSize * 1.5;
       const geo = new THREE.BoxGeometry(cellSize * 0.85, h, cellSize * 0.85);
@@ -70,12 +91,14 @@ export class CityScene {
       edges.position.copy(mesh.position);
       this.scene.add(edges);
 
+      this._buildingObjects.push(mesh, edges);
+
       if (b.height >= 3) {
         const light = new THREE.PointLight(0xffd060, 0.4, 5);
         light.position.set(b.col * cellSize, h + 0.3, b.row * cellSize);
         this.scene.add(light);
+        this._buildingObjects.push(light);
       }
-      this._buildingMeshes.push(mesh);
     }
   }
 
@@ -105,8 +128,8 @@ export class CityScene {
     this._noFlyMeshes = [];
   }
 
-  update() { this.controls.update(); }
-  render() { this.renderer.render(this.scene, this.camera); }
+  update()  { this.controls.update(); }
+  render()  { this.renderer.render(this.scene, this.camera); }
 
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
