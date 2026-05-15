@@ -21,11 +21,13 @@ export class CityScene {
   }
 
   _addLights() {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const dir = new THREE.DirectionalLight(0xfff8ee, 1.3);
+    // Lower ambient so Phong shading produces visible face contrast
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dir = new THREE.DirectionalLight(0xfff0d0, 0.8);
     dir.position.set(20, 40, 20);
     this.scene.add(dir);
-    const fill = new THREE.DirectionalLight(0xc8dcf0, 0.4);
+    // Cool sky fill — tints shadow faces slightly blue for atmosphere
+    const fill = new THREE.DirectionalLight(0xaac8e8, 0.25);
     fill.position.set(-10, 10, -10);
     this.scene.add(fill);
   }
@@ -33,13 +35,14 @@ export class CityScene {
   _addGround(size = 80) {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(size, size),
-      new THREE.MeshPhongMaterial({ color: 0xb8c8d8 })
+      new THREE.MeshPhongMaterial({ color: 0x304a62 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(size / 4, -0.01, size / 4);
     this.scene.add(ground);
 
-    const grid = new THREE.GridHelper(size, size / 2, 0x7a98b8, 0xa0b8cc);
+    // Lighter grid lines stand out against the dark ground
+    const grid = new THREE.GridHelper(size, size / 2, 0x7090aa, 0x608098);
     grid.position.set(size / 4, 0, size / 4);
     this.scene.add(grid);
   }
@@ -50,7 +53,7 @@ export class CityScene {
       const h = b.height * cellSize * 1.5;
       const geo = new THREE.BoxGeometry(cellSize * 0.85, h, cellSize * 0.85);
       const mat = new THREE.MeshPhongMaterial({
-        color: 0xd0dce8, emissive: 0x000000, transparent: true, opacity: 0.9,
+        color: 0x9ab4ca, emissive: 0x000000, transparent: true, opacity: 0.95,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(b.col * cellSize, h / 2, b.row * cellSize);
@@ -58,7 +61,7 @@ export class CityScene {
 
       const edges = new THREE.LineSegments(
         new THREE.EdgesGeometry(geo),
-        new THREE.LineBasicMaterial({ color: 0x5878a0, transparent: true, opacity: 0.55 })
+        new THREE.LineBasicMaterial({ color: 0x1e3850, transparent: true, opacity: 0.7 })
       );
       edges.position.copy(mesh.position);
       this.scene.add(edges);
