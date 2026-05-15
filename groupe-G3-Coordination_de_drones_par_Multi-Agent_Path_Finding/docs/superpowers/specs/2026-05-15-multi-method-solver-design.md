@@ -177,7 +177,7 @@ Le parsing de `paths` reste identique. `DroneManager`, `CityScene`, `UIManager` 
 | ECBS | ≤ 1.3 × optimal | <1s | Recommandé pour la démo |
 | A\* OD | Optimale | Variable | Lent si N > 6 |
 
-**Note :** CBS et ECBS minimisent la **somme des longueurs de chemin** (flow time), pas le makespan. CP-SAT et A\* OD minimisent le makespan. Les résultats sont comparables mais pas identiques.
+**Note :** CBS et ECBS minimisent la **somme des longueurs de chemin** (flow time), pas le makespan. CP-SAT et A\* OD minimisent le makespan. Le champ `makespan` retourné par CBS/ECBS est calculé depuis les chemins (`max(len(path)) - 1`) — valeur correcte, mais pas ce qui a été optimisé. Le `status` d'ECBS est `"feasible"` (pas `"optimal"`) car la solution est w-suboptimale.
 
 ---
 
