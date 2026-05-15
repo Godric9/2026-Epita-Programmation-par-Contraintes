@@ -310,6 +310,17 @@
     background: var(--danger-dim);
     box-shadow: 0 1px 4px rgba(220, 38, 38, 0.1);
   }
+
+  select {
+    padding: 8px 12px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  select:hover { border-color: #3b82f6; color: #fff; }
 </style>
 </head>
 <body>
@@ -322,6 +333,10 @@
   <div class="hud-row">
     <span class="hud-lbl">Status</span>
     <span class="val" id="h-status">—</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-lbl">Méthode</span>
+    <span class="val" id="h-method">—</span>
   </div>
   <div class="hud-row">
     <span class="hud-lbl">Makespan</span>
@@ -354,6 +369,12 @@
   </div>
   <div class="ctrl-divider"></div>
   <div class="ctrl-actions">
+    <select id="sel-method" title="Solving method">
+      <option value="cpsat">CP-SAT optimal</option>
+      <option value="cbs">CBS (optimal)</option>
+      <option value="ecbs">ECBS (rapide ×1.3)</option>
+      <option value="od_astar">A* OD (optimal, N≤5)</option>
+    </select>
     <button id="btn-solve">&#x26A1; Solve</button>
     <button id="btn-nofly">&#x1F6AB; No-Fly</button>
     <button id="btn-clear-nofly" title="Clear no-fly zones">&#x2715;</button>
@@ -434,17 +455,20 @@ async function solve(scenario, nofly = []) {
   const statusEl = document.getElementById('h-status');
   statusEl.textContent = 'Solving…';
   statusEl.classList.add('solving');
-  ['h-makespan', 'h-time', 'h-conflicts', 'h-frame'].forEach(id => {
+  ['h-makespan', 'h-time', 'h-conflicts', 'h-frame', 'h-method'].forEach(id => {
     document.getElementById(id).textContent = '—';
   });
 
   if (droneManager) { droneManager.dispose(cityScene.scene); droneManager = null; }
+
+  const method = document.getElementById('sel-method').value;
 
   solution = await fetchSolve({
     grid:      scenario.grid,
     drones:    scenario.drones,
     buildings: scenario.buildings || [],
     nofly,
+    method,
     time_limit_s: 30,
   });
 
@@ -453,6 +477,7 @@ async function solve(scenario, nofly = []) {
   document.getElementById('h-makespan').textContent  = solution.makespan;
   document.getElementById('h-time').textContent      = solution.solve_time_ms + 'ms';
   document.getElementById('h-conflicts').textContent = solution.conflicts_avoided;
+  document.getElementById('h-method').textContent    = solution.method ?? method;
 
   if (solution.status !== 'optimal' && solution.status !== 'feasible') return;
 
