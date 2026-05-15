@@ -1,6 +1,7 @@
 import json
 import pytest
 from api.server import create_app
+from api.scenario_loader import load_all
 
 @pytest.fixture
 def client():
@@ -60,3 +61,16 @@ def test_solve_returns_solve_time(client):
     data = json.loads(r.data)
     assert "solve_time_ms" in data
     assert data["solve_time_ms"] > 0
+
+def test_load_all_returns_five_scenarios():
+    scenarios = load_all()
+    assert len(scenarios) == 5
+
+def test_each_scenario_has_required_keys():
+    for s in load_all():
+        assert "name" in s
+        assert "description" in s
+        assert "grid" in s
+        assert "drones" in s
+        assert "buildings" in s
+        assert {"rows", "cols", "alts"} == set(s["grid"].keys())
