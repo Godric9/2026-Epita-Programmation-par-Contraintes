@@ -1322,10 +1322,17 @@ function renderAssignmentResults(payload) {
   ].join(" • ");
 
   if (!payload.assignments?.length) {
+    let emptyStateMessage = "Aucune paire n'a satisfait les contraintes d'éligibilité ou la capacité disponible.";
+    if (payload.solver_status === "infeasible") {
+      emptyStateMessage = "Le modèle CP-SAT est infaisable avec les contraintes actives. Vérifiez surtout les contraintes d'éligibilité et de diversité.";
+    } else if (payload.eligible_pairs > 0) {
+      emptyStateMessage = "Des paires étaient éligibles, mais aucune n'a pu être retenue par l'optimisation sous contraintes.";
+    }
+
     assignmentResults.innerHTML = `
       <article class="record-item">
         <h3>Aucune affectation retenue</h3>
-        <p class="record-meta">Aucune paire n'a satisfait les contraintes d'éligibilité ou la capacité disponible.</p>
+        <p class="record-meta">${emptyStateMessage}</p>
       </article>
     `;
     return;

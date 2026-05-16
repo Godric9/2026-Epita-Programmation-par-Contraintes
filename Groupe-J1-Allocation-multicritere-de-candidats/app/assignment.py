@@ -169,6 +169,18 @@ class AssignmentSolver:
         decision_vars: Dict[tuple[str, str], cp_model.IntVar],
     ) -> None:
         for job in jobs:
+            job_vars = [
+                decision_vars[(candidate.id, job.id)]
+                for candidate in candidates
+                if (candidate.id, job.id) in decision_vars
+            ]
+            if not job_vars:
+                continue
+
+            job_selected = model.NewBoolVar(f"job_selected_{job.id}")
+            model.Add(sum(job_vars) >= 1).OnlyEnforceIf(job_selected)
+            model.Add(sum(job_vars) == 0).OnlyEnforceIf(job_selected.Not())
+
             for rule in job.target_profile.diversity_constraints:
                 if rule.priority != "required":
                     continue
@@ -182,9 +194,9 @@ class AssignmentSolver:
 
                 if rule.minimum_count > 0:
                     if matching_vars:
-                        model.Add(sum(matching_vars) >= rule.minimum_count)
+                        model.Add(sum(matching_vars) >= rule.minimum_count).OnlyEnforceIf(job_selected)
                     else:
-                        self._mark_model_infeasible(model, f"missing_required_diversity_{job.id}_{rule.dimension}")
+                        model.Add(job_selected == 0)
 
                 if rule.maximum_count is not None and matching_vars:
                     model.Add(sum(matching_vars) <= rule.maximum_count)
@@ -198,11 +210,6 @@ class AssignmentSolver:
         if rule.dimension == "gender":
             return candidate.diversity.gender.strip().lower() == normalized_value
         return normalized_value in {tag.strip().lower() for tag in candidate.diversity.self_declared_tags if tag.strip()}
-
-    def _mark_model_infeasible(self, model: cp_model.CpModel, suffix: str) -> None:
-        impossible = model.NewBoolVar(f"impossible_{suffix}")
-        model.Add(impossible == 1)
-        model.Add(impossible == 0)
 
     def _preferred_diversity_bonus(
         self,
