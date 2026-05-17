@@ -4,24 +4,9 @@ import heapq
 import time
 from typing import Dict, List, Tuple
 from .grid import Grid, Pos
+from .astar import astar, heuristic, bfs_dist
 from .mapf import Drone, Solution
 from .cbs import _near_passes
-
-
-def _bfs_dist(grid: Grid, goal: Pos) -> Dict[Pos, int]:
-    """BFS from goal — gives min steps from any pos to goal."""
-    dist = {goal: 0}
-    queue = [goal]
-    while queue:
-        nxt = []
-        for pos in queue:
-            d = dist[pos]
-            for nb in grid.neighbors(pos):
-                if nb != pos and nb not in dist:
-                    dist[nb] = d + 1
-                    nxt.append(nb)
-        queue = nxt
-    return dist
 
 
 class ODAstarSolver:
@@ -52,7 +37,7 @@ class ODAstarSolver:
         goals = tuple(d.goal for d in self.drones)
         drone_ids = [d.id for d in self.drones]
 
-        h_maps = [_bfs_dist(self.grid, goals[i]) for i in range(N)]
+        h_maps = [bfs_dist(self.grid, goals[i]) for i in range(N)]
         INF = 10 ** 9
 
         def h(positions: Tuple[Pos, ...]) -> int:

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 from ortools.sat.python import cp_model
 from .grid import Grid, Pos
-from .astar import astar
+from .astar import astar, bfs_dist
 
 
 @dataclass
@@ -38,7 +38,6 @@ class MAPFSolver:
 
         t0 = time.time()
 
-        # A* individual paths — horizon + warm-start hints (unchanged)
         astar_paths: List[Optional[List[Pos]]] = [
             astar(self.grid, d.start, d.goal) for d in self.drones
         ]
@@ -50,66 +49,74 @@ class MAPFSolver:
 
         model = cp_model.CpModel()
 
-        # Neighbor index lists (includes self for wait move)
         nbrs: List[List[int]] = [
             [pos_to_idx[nb] for nb in self.grid.neighbors(positions[p]) if nb in pos_to_idx]
             for p in range(P)
         ]
 
-        # ── Variables ────────────────────────────────────────────────────────
-        # here[a][p][t]: agent a is at position p at time t
-        here = [
-            [[model.NewBoolVar(f'here_{a}_{p}_{t}') for t in range(T + 1)]
-             for p in range(P)]
-            for a in range(N)
-        ]
+        # ── Domain reduction ────────────────────────────────────────────────────
+        INF = 10 ** 9
+        dist_from_start = [bfs_dist(self.grid, d.start) for d in self.drones]
+        dist_to_goal    = [bfs_dist(self.grid, d.goal)  for d in self.drones]
 
-        # move[(a,p,q,t)]: agent a moves from p to q at time t (q ∈ nbrs[p], includes wait p→p)
+        # ── Variables ───────────────────────────────────────────────────────────
+        here: Dict[Tuple[int, int, int], cp_model.IntVar] = {}
+        for a in range(N):
+            for p in range(P):
+                d_s = dist_from_start[a].get(positions[p], INF)
+                d_g = dist_to_goal[a].get(positions[p], INF)
+                for t in range(T + 1):
+                    if d_s <= t and d_g <= T - t:
+                        here[(a, p, t)] = model.NewBoolVar(f'h_{a}_{p}_{t}')
+
         move: Dict[Tuple[int, int, int, int], cp_model.IntVar] = {}
         for a in range(N):
             for t in range(T):
                 for p in range(P):
+                    if (a, p, t) not in here:
+                        continue
                     for q in nbrs[p]:
-                        move[(a, p, q, t)] = model.NewBoolVar(f'mv_{a}_{p}_{q}_{t}')
+                        if (a, q, t + 1) in here:
+                            move[(a, p, q, t)] = model.NewBoolVar(f'm_{a}_{p}_{q}_{t}')
 
-        # ── Constraints ──────────────────────────────────────────────────────
-        # 1. Exactly one position per agent per timestep
+        # ── Contraintes ─────────────────────────────────────────────────────────
+        # 1. Exactement une position par agent par pas de temps
         for a in range(N):
             for t in range(T + 1):
-                model.AddExactlyOne(here[a][p][t] for p in range(P))
+                at_t = [here[(a, p, t)] for p in range(P) if (a, p, t) in here]
+                if at_t:
+                    model.AddExactlyOne(at_t)
 
-        # 2. Initial positions
+        # 2. Positions initiales
         for a, drone in enumerate(self.drones):
             start_idx = pos_to_idx.get(drone.start)
-            if start_idx is None:
+            if start_idx is None or (a, start_idx, 0) not in here:
                 return Solution("infeasible", 0, 0, 0.0, {}, 0)
-            model.Add(here[a][start_idx][0] == 1)
+            model.Add(here[(a, start_idx, 0)] == 1)
 
-        # 3. Movement — flow conservation linking here ↔ move
-        #    Grid is undirected: nbrs[p] == reverse_nbrs[p] (symmetry + self-loop for wait)
+        # 3. Conservation de flux here ↔ move
         for a in range(N):
             for t in range(T):
                 for p in range(P):
-                    # Outgoing: exactly one move leaves p at t iff agent is there
-                    model.Add(
-                        sum(move[(a, p, q, t)] for q in nbrs[p]) == here[a][p][t]
-                    )
-                    # Incoming: agent at p at t+1 came from some q via move q→p
-                    model.Add(
-                        sum(move[(a, q, p, t)] for q in nbrs[p]) == here[a][p][t + 1]
-                    )
+                    if (a, p, t) not in here:
+                        continue
+                    out = [move[(a, p, q, t)] for q in nbrs[p] if (a, p, q, t) in move]
+                    model.Add(sum(out) == here[(a, p, t)])
+                    if (a, p, t + 1) in here:
+                        inc = [move[(a, q, p, t)] for q in nbrs[p] if (a, q, p, t) in move]
+                        model.Add(sum(inc) == here[(a, p, t + 1)])
 
-        # 4. Vertex conflict — AddNoOverlap per position (CSP-4 primitive)
-        #    Replaces P*(T+1) individual AddAtMostOne constraints
+        # 4. Conflit sommet — AddNoOverlap par position (CSP-4)
         for p in range(P):
-            model.AddNoOverlap([
-                model.NewOptionalIntervalVar(t, 1, t + 1, here[a][p][t], f'ivp_{a}_{p}_{t}')
-                for a in range(N)
-                for t in range(T + 1)
-            ])
+            iv_list = [
+                model.NewOptionalIntervalVar(t, 1, t + 1, here[(a, p, t)], f'ivp_{a}_{p}_{t}')
+                for a in range(N) for t in range(T + 1)
+                if (a, p, t) in here
+            ]
+            if iv_list:
+                model.AddNoOverlap(iv_list)
 
-        # 5. Edge (swap) conflict — AddNoOverlap per undirected arc (CSP-4 primitive)
-        #    Replaces T*N*(N-1)/2*P*avg_nbrs individual 4-literal constraints
+        # 5. Conflit arête (swap) — AddNoOverlap par arc non-orienté (CSP-4)
         seen_arcs: Set[Tuple[int, int]] = set()
         for p in range(P):
             for q in nbrs[p]:
@@ -120,34 +127,41 @@ class MAPFSolver:
                         iv_arc = []
                         for a in range(N):
                             for t in range(T):
-                                iv_arc.append(model.NewOptionalIntervalVar(
-                                    t, 1, t + 1, move[(a, p, q, t)], f'iva_{a}_{p}_{q}_{t}'
-                                ))
-                                iv_arc.append(model.NewOptionalIntervalVar(
-                                    t, 1, t + 1, move[(a, q, p, t)], f'iva_{a}_{q}_{p}_{t}'
-                                ))
-                        model.AddNoOverlap(iv_arc)
+                                if (a, p, q, t) in move:
+                                    iv_arc.append(model.NewOptionalIntervalVar(
+                                        t, 1, t + 1, move[(a, p, q, t)], f'iva_{a}_{p}_{q}_{t}'
+                                    ))
+                                if (a, q, p, t) in move:
+                                    iv_arc.append(model.NewOptionalIntervalVar(
+                                        t, 1, t + 1, move[(a, q, p, t)], f'iva_{a}_{q}_{p}_{t}'
+                                    ))
+                        if iv_arc:
+                            model.AddNoOverlap(iv_arc)
 
-        # 6. Goal persistence: once at goal, stay there
+        # 6. Persistance au but
         for a, drone in enumerate(self.drones):
             goal_idx = pos_to_idx.get(drone.goal)
             if goal_idx is None:
                 return Solution("infeasible", 0, 0, 0.0, {}, 0)
             for t in range(T):
-                model.Add(here[a][goal_idx][t + 1] >= here[a][goal_idx][t])
+                if (a, goal_idx, t) in here and (a, goal_idx, t + 1) in here:
+                    model.Add(here[(a, goal_idx, t + 1)] >= here[(a, goal_idx, t)])
 
-        # ── Objective (unchanged) ─────────────────────────────────────────────
+        # ── Objectif ────────────────────────────────────────────────────────────
         makespan_var = model.NewIntVar(0, T, 'makespan')
         arrival_vars = []
         for a, drone in enumerate(self.drones):
             goal_idx = pos_to_idx[drone.goal]
+            goal_vars = [here[(a, goal_idx, t)] for t in range(T + 1) if (a, goal_idx, t) in here]
+            if not goal_vars:
+                return Solution("infeasible", 0, 0, (time.time() - t0) * 1000, {}, 0)
             arr = model.NewIntVar(0, T, f'arrival_{a}')
-            model.Add(arr == T + 1 - sum(here[a][goal_idx][t] for t in range(T + 1)))
+            model.Add(arr == T + 1 - sum(goal_vars))
             arrival_vars.append(arr)
         model.AddMaxEquality(makespan_var, arrival_vars)
         model.Minimize(makespan_var)
 
-        # ── Warm-start (unchanged, on here instead of x) ─────────────────────
+        # ── Warm-start ──────────────────────────────────────────────────────────
         for a, path in enumerate(astar_paths):
             if path is None:
                 continue
@@ -157,9 +171,10 @@ class MAPFSolver:
                 if hint_idx is None:
                     continue
                 for p in range(P):
-                    model.AddHint(here[a][p][t], 1 if p == hint_idx else 0)
+                    if (a, p, t) in here:
+                        model.AddHint(here[(a, p, t)], 1 if p == hint_idx else 0)
 
-        # ── Solve ─────────────────────────────────────────────────────────────
+        # ── Résolution ──────────────────────────────────────────────────────────
         elapsed_build = time.time() - t0
         if elapsed_build >= self.time_limit_s:
             return Solution("timeout", 0, 0, elapsed_build * 1000, {}, 0)
@@ -184,13 +199,12 @@ class MAPFSolver:
 
         makespan_val = int(solver.ObjectiveValue())
 
-        # ── Path extraction (unchanged, here instead of x) ───────────────────
         paths: Dict[int, List[Pos]] = {}
         for a, drone in enumerate(self.drones):
             path: List[Pos] = []
             for t in range(makespan_val + 1):
                 for p in range(P):
-                    if solver.Value(here[a][p][t]):
+                    if (a, p, t) in here and solver.Value(here[(a, p, t)]):
                         path.append(positions[p])
                         break
             paths[drone.id] = path

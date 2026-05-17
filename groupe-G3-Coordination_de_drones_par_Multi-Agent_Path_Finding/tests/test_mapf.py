@@ -82,6 +82,22 @@ def test_all_drones_reach_goal():
     for d in drones:
         assert sol.paths[d.id][-1] == d.goal
 
+def test_cpsat_domain_reduction_correct_paths():
+    """Vérifie que le refactor domain-reduction ne casse pas les résultats."""
+    g = Grid(rows=5, cols=5)
+    g.add_building(2, 2, 1)  # obstacle central
+    drones = [
+        Drone(id=0, start=(0, 0), goal=(4, 4)),
+        Drone(id=1, start=(4, 0), goal=(0, 4)),
+    ]
+    sol = MAPFSolver(g, drones, time_limit_s=30).solve()
+    assert sol.status in ("optimal", "feasible")
+    for d in drones:
+        assert sol.paths[d.id][-1] == d.goal
+    # Aucun chemin ne passe par l'obstacle
+    for path in sol.paths.values():
+        assert (2, 2) not in path
+
 def test_3d_solver_avoids_building():
     g = Grid(rows=6, cols=6, alts=3)
     g.add_building(row=3, col=3, height=2)  # blocks (3,3,0) and (3,3,1)

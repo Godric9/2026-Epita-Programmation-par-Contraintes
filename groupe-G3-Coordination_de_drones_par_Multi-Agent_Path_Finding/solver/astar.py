@@ -40,3 +40,19 @@ def astar(grid: Grid, start: Pos, goal: Pos) -> Optional[List[Pos]]:
                 heapq.heappush(open_heap, (ng + heuristic(nb, goal), ng, nb))
 
     return None  # no path found
+
+
+def bfs_dist(grid: Grid, goal: Pos) -> Dict[Pos, int]:
+    """BFS depuis le but — retourne le nombre minimal de pas depuis chaque position."""
+    dist: Dict[Pos, int] = {goal: 0}
+    queue = [goal]
+    while queue:
+        nxt = []
+        for pos in queue:
+            d = dist[pos]
+            for nb in grid.neighbors(pos):
+                if nb != pos and nb not in dist:
+                    dist[nb] = d + 1
+                    nxt.append(nb)
+        queue = nxt
+    return dist
