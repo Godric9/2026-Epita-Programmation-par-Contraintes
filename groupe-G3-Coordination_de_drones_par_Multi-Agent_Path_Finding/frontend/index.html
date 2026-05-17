@@ -489,6 +489,8 @@ async function init() {
 }
 
 function loadScenario(scenario) {
+  playing = false; frame = 0; solution = null;
+  if (droneManager) { droneManager.dispose(cityScene.scene); droneManager = null; }
   currentScenario = scenario;
   const { rows, cols, alts } = scenario.grid;
   cityScene.resetGrid(rows, cols, alts);
