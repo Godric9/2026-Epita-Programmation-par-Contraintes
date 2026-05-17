@@ -39,7 +39,7 @@ export class DroneManager {
         new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55 })
       );
       ring.rotation.x = -Math.PI / 2;
-      ring.position.set(d.start[1] * CELL, startY, d.start[0] * CELL);
+      ring.position.set((d.start[1] + 0.5) * CELL, startY, (d.start[0] + 0.5) * CELL);
       scene.add(ring);
 
       // Goal — pillar up to goal altitude + ring + star at that height
@@ -49,11 +49,11 @@ export class DroneManager {
         new THREE.CylinderGeometry(0.05, 0.05, pillarH, 8),
         new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.65 })
       );
-      pillar.position.set(d.goal[1] * CELL, pillarH / 2, d.goal[0] * CELL);
+      pillar.position.set((d.goal[1] + 0.5) * CELL, pillarH / 2, (d.goal[0] + 0.5) * CELL);
       scene.add(pillar);
 
       const beacon = new THREE.PointLight(col, 0.9, 3.5);
-      beacon.position.set(d.goal[1] * CELL, goalY, d.goal[0] * CELL);
+      beacon.position.set((d.goal[1] + 0.5) * CELL, goalY, (d.goal[0] + 0.5) * CELL);
       scene.add(beacon);
 
       const goalRing = new THREE.Mesh(
@@ -61,7 +61,7 @@ export class DroneManager {
         new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8 })
       );
       goalRing.rotation.x = -Math.PI / 2;
-      goalRing.position.set(d.goal[1] * CELL, goalY, d.goal[0] * CELL);
+      goalRing.position.set((d.goal[1] + 0.5) * CELL, goalY, (d.goal[0] + 0.5) * CELL);
       scene.add(goalRing);
 
       // Star marker just above the goal ring
@@ -69,7 +69,7 @@ export class DroneManager {
         new THREE.OctahedronGeometry(0.18),
         new THREE.MeshBasicMaterial({ color: col })
       );
-      star.position.set(d.goal[1] * CELL, goalY + 0.35, d.goal[0] * CELL);
+      star.position.set((d.goal[1] + 0.5) * CELL, goalY + 0.35, (d.goal[0] + 0.5) * CELL);
       scene.add(star);
 
       this.drones.push({
@@ -81,9 +81,9 @@ export class DroneManager {
 
   _toWorld(pos) {
     return new THREE.Vector3(
-      pos[1] * CELL,
+      (pos[1] + 0.5) * CELL,
       (pos[2] ?? 0) * CELL * 1.5 + 0.4,
-      pos[0] * CELL
+      (pos[0] + 0.5) * CELL
     );
   }
 

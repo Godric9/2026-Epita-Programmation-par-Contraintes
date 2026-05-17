@@ -131,7 +131,7 @@ class _CTNode:
 def _compute_max_t(grid: Grid, drones: List[Drone]) -> int:
     lens = [len(astar(grid, d.start, d.goal) or [(None,)]) - 1 for d in drones]
     valid = [l for l in lens if l >= 0]
-    return (max(valid) if valid else 0) + len(drones) + 5
+    return (max(valid) if valid else 0) + 2 * len(drones) + 10
 
 
 class CBSSolver:

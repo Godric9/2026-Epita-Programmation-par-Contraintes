@@ -44,7 +44,7 @@ class MAPFSolver:
         ]
         astar_lens = [len(p) - 1 for p in astar_paths if p is not None]
         if astar_lens:
-            T = max(astar_lens) + max(N - 1, 3)
+            T = max(astar_lens) + 2 * N + 5
         else:
             T = 2 * (self.grid.rows + self.grid.cols) + N
 

@@ -80,7 +80,7 @@ export class CityScene {
         color: 0x9ab4ca, emissive: 0x000000, transparent: true, opacity: 0.95,
       });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(b.col * cellSize, h / 2, b.row * cellSize);
+      mesh.position.set((b.col + 0.5) * cellSize, h / 2, (b.row + 0.5) * cellSize);
       this.scene.add(mesh);
 
       const edges = new THREE.LineSegments(
@@ -94,7 +94,7 @@ export class CityScene {
 
       if (b.height >= 3) {
         const light = new THREE.PointLight(0xffd060, 0.4, 5);
-        light.position.set(b.col * cellSize, h + 0.3, b.row * cellSize);
+        light.position.set((b.col + 0.5) * cellSize, h + 0.3, (b.row + 0.5) * cellSize);
         this.scene.add(light);
         this._buildingObjects.push(light);
       }
