@@ -165,7 +165,7 @@ class MAPFSolver:
             return Solution("timeout", 0, 0, elapsed_build * 1000, {}, 0)
 
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = self.time_limit_s
+        solver.parameters.max_time_in_seconds = max(1.0, self.time_limit_s - elapsed_build)
         solver.parameters.num_search_workers = 4
 
         status_code = solver.Solve(model)
